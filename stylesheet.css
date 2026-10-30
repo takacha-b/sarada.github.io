@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>こびとからお皿を守れ！（皿打風）</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fdf6e3;--fg:#3b2f2f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1d1a2b;--fg:#f3eee0}}
+:root[data-theme="dark"]{--bg:#1d1a2b;--fg:#f3eee0}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"DotGothic16",system-ui,"Hiragino Sans","Noto Sans JP",sans-serif;display:flex;flex-direction:column;align-items:center;padding:12px}
+h1{font-size:1.15rem;margin:4px 0 8px}
+#wrap{position:relative;width:100%;max-width:800px}
+canvas{width:100%;height:auto;display:block;border-radius:12px}
+#ov{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:auto;gap:10px;background:rgba(0,0,0,.65);color:#fff;border-radius:12px;text-align:center;padding:16px}
+#ov h2{margin:0;font-size:1.4rem}#ov p{margin:0;line-height:1.6;font-size:.95rem}
+.row{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+button{font:inherit;font-weight:400;padding:8px 16px;border:0;border-radius:999px;background:#ff9f43;color:#3b2f2f;cursor:pointer}
+button.sel{background:#fff;outline:3px solid #ff9f43}button:disabled{opacity:.35;cursor:not-allowed}
+textarea{width:min(92%,560px);font:14px monospace;padding:8px;border-radius:8px;border:0;background:#fff;color:#222;resize:none;box-sizing:border-box}
+small{opacity:.7;margin-top:8px}
+#ov>:first-child{margin-top:auto}#ov>:last-child{margin-bottom:auto}
+@media (max-width:620px){#ov{gap:6px;padding:8px}#ov h2{font-size:1.05rem}#ov p{font-size:.78rem;line-height:1.4}button{padding:5px 10px;font-size:.8rem}}
+</style></head><body>
+<h1>🍰 こびとからお皿を守れ！</h1>
+<div id="wrap"><canvas id="c" width="800" height="450"></canvas><div id="ov"></div></div>
+<small>PCのキーボードで遊んでね（半角・英字入力）。chi/ti、shi/si など別のつづりもOK。Backspaceで狙いをリセット、Escでメニュー</small>
+<script>
+(()=>{
+const W=800,H=450,CX=W/2,CY=H/2,PR=170,TIME=120;
+try{document.fonts&&document.fonts.load('16px "DotGothic16"','あaA')}catch(e){}
+const cv=document.getElementById('c'),ctx=cv.getContext('2d'),ov=document.getElementById('ov');
+if(!ctx.roundRect)ctx.roundRect=function(x,y,w,h){this.rect(x,y,w,h)};
+const T={か:['ka'],き:['ki'],く:['ku'],け:['ke'],こ:['ko'],さ:['sa'],し:['shi','si'],す:['su'],せ:['se'],そ:['so'],た:['ta'],ち:['chi','ti'],つ:['tsu','tu'],て:['te'],と:['to'],な:['na'],に:['ni'],ぬ:['nu'],ね:['ne'],の:['no'],は:['ha'],ひ:['hi'],ふ:['fu','hu'],へ:['he'],ほ:['ho'],ま:['ma'],み:['mi'],む:['mu'],め:['me'],も:['mo'],や:['ya'],ゆ:['yu'],よ:['yo'],ら:['ra'],り:['ri'],る:['ru'],れ:['re'],ろ:['ro'],わ:['wa'],を:['wo'],が:['ga'],ぎ:['gi'],ぐ:['gu'],げ:['ge'],ご:['go'],ざ:['za'],じ:['ji','zi'],ず:['zu'],ぜ:['ze'],ぞ:['zo'],だ:['da'],ぢ:['di'],づ:['du'],で:['de'],ど:['do'],ば:['ba'],び:['bi'],ぶ:['bu'],べ:['be'],ぼ:['bo'],ぱ:['pa'],ぴ:['pi'],ぷ:['pu'],ぺ:['pe'],ぽ:['po'],あ:['a'],い:['i'],う:['u'],え:['e'],お:['o'],'ー':['-']};
+const SP={し:{ゃ:['sha','sya'],ゅ:['shu','syu'],ょ:['sho','syo']},ち:{ゃ:['cha','tya'],ゅ:['chu','tyu'],ょ:['cho','tyo']},じ:{ゃ:['ja','zya'],ゅ:['ju','zyu'],ょ:['jo','zyo']}};
+const SM={ゃ:'ya',ゅ:'yu',ょ:'yo'};
+function cands(s,cap){
+  const c=[...s];let r=[''],dbl=false;
+  for(let i=0;i<c.length;i++){
+    const ch=c[i],nx=c[i+1];let a;
+    if(ch==='っ'){dbl=true;continue}
+    if(ch==='ん'){a=(nx&&/[あいうえおなにぬねのやゆよ]/.test(nx))?['nn']:(nx?['n','nn']:['nn','n'])}
+    else if(nx&&SM[nx]){a=SP[ch]?SP[ch][nx]:[T[ch][0].slice(0,-1)+SM[nx]];i++}
+    else a=T[ch];
+    if(dbl){a=a.map(x=>x[0]+x);dbl=false}
+    r=r.flatMap(p=>a.map(x=>p+x)).slice(0,cap||40);
+  }
+  return r;
+}
+const WORDS="まぐろ たまご えび いか たこ あなご うに いくら さーもん はまち ひらめ たい かんぱち しめさば ほたて かっぱまき てっかまき ちらしずし いなりずし ぐんかん なっとう おしんこ あがり がり わさび しょうゆ おちゃ みそしる ちゃわんむし たまごやき ねぎとろ とろ ふぐ かに さんま いわし あじ かつお はも うなぎ ぶり さば しゃり のり ごはん おにぎり てんぷら からあげ ぎゅうどん うどん そば らーめん ぷりん だんご せんべい おちょこ".split(' ');
+const WL=WORDS.map(w=>{const cs=cands(w);return{w,cs,len:Math.min(...cs.map(x=>x.length))}});
+const FW={'🍳':.9,'🥓':.7,'🍞':1.3,'🍰':2.2,'🥕':1,'🥦':1.1,'🍅':.8,'🌽':1,'🍪':.6,'🍫':1.4,'🍩':1,'🍓':.5,'🍬':.5};
+const STAGES=[
+ {n:'あさごはん',foods:['🍳','🥓','🍞'],min:2},
+ {n:'ショートケーキ',foods:['🍰'],min:1},
+ {n:'やさいのおさら',foods:['🥕','🥦','🍅','🌽'],must:'🥕',min:2},
+ {n:'クッキータイム',foods:['🍪'],min:1,bite:true,pieces:20},
+ {n:'おやつパーティ',foods:['🍫','🍩','🍰','🍓','🍬'],must:'🍫',min:3}];
+const DIFF=[{n:'かんたん',sp:.7,iv:1.5,boss:0,len:0},{n:'ふつう',sp:.85,iv:1.2,boss:1,len:1},{n:'むずかしい',sp:1,iv:.95,boss:1,len:2},{n:'げきむず',sp:1.2,iv:.8,boss:1,len:3}];
+const TYPES=[{c:'#58b947',sp:60,pw:1,pt:10,ml:6,sz:1},{c:'#4a90e2',sp:95,pw:.6,pt:15,ml:4,sz:.9},{c:'#e24a4a',sp:40,pw:2.2,pt:20,ml:7,sz:1.15},{c:'#f2c230',sp:70,pw:1.2,pt:40,ml:8,sz:1}];
+const BOSS={c:'#8e44ad',sp:50,pw:2.5,pt:100,sz:1.8};
+const BOSSP=[
+ ['ぼくはおにぎりがすき','こびとなんかこわくない','おいしいたまごやき','たべものをまもるぞ','おやつのじかんです'],
+ ['おさらのうえのたべものをまもれ','ぜんぶたべられるまえにたおせ','おいしいごはんはみんなでたべよう','とってもおなかがすいたこびとたち'],
+ ['ゆだんしているとたべものがなくなる','こびとがあつまるまえにぜんぶたおそう','おいしいおやつをこびとにわたすな','おなかをすかせたこびとがやってくる'],
+ ['さいごまでおさらのたべものをまもりぬこう','こびとたちのこうげきをさいごまでたえぬけ','おなかをすかせたこびとたちがおさらにせまる','たべものをうばいにくるこびとをたいじしよう']];
+function bossWord(){const l=BOSSP[selD],w=l[Math.floor(Math.random()*l.length)];return{w,cs:cands(w,4000)}}
+let S={mode:'menu'},last=0,selD=1;
+// ===== セーブデータ（ブラウザ保存 + 16進数のセーブコード）=====
+const SV={p:[0,0,0,0],b:new Array(20).fill(0)}; // p: 難易度ごとのクリア済みステージ数(0〜5) / b: 難易度×ステージのベストスコア
+const lsGet=k=>{try{return +localStorage.getItem(k)||0}catch(e){return 0}};
+const lsSet=(k,v)=>{try{localStorage.setItem(k,String(v))}catch(e){}};
+function loadLS(){for(let d=0;d<4;d++){SV.p[d]=Math.max(0,Math.min(5,lsGet('sara-p'+d)));for(let i=0;i<5;i++)SV.b[d*5+i]=Math.max(0,Math.min(65535,lsGet('sara-b'+d+'-'+i)))}}
+function persist(){for(let d=0;d<4;d++){lsSet('sara-p'+d,SV.p[d]);for(let i=0;i<5;i++)lsSet('sara-b'+d+'-'+i,SV.b[d*5+i])}}
+function crc8(a){let c=0;for(const x of a){c^=x;for(let i=0;i<8;i++)c=(c&128)?(((c<<1)^7)&255):((c<<1)&255)}return c}
+// コード形式: [版=01][進行x4][ベストx20(各2バイト)][CRC8] = 46バイト = 92桁の16進数
+function encodeSave(){
+  const a=[1,...SV.p];for(const v of SV.b)a.push(v>>8,v&255);a.push(crc8(a));
+  return a.map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+}
+function decodeSave(str){
+  const h=String(str).replace(/[\s\-_]/g,'').toLowerCase();
+  if(!h)return{err:'コードが入力されていません'};
+  if(!/^[0-9a-f]+$/.test(h))return{err:'16進数（0-9 と A-F）以外の文字が含まれています'};
+  if(h.length!==92)return{err:'コードの長さが違います（'+h.length+'桁／必要:92桁）'};
+  const a=[];for(let i=0;i<h.length;i+=2)a.push(parseInt(h.slice(i,i+2),16));
+  if(crc8(a.slice(0,-1))!==a[a.length-1])return{err:'チェックサムが合いません（コードの書き間違い・欠けの可能性）'};
+  if(a[0]!==1)return{err:'未対応のバージョンのコードです'};
+  const p=a.slice(1,5);if(p.some(v=>v>5))return{err:'データが不正です'};
+  const b=[];for(let i=0;i<20;i++)b.push((a[5+i*2]<<8)|a[6+i*2]);
+  return{p,b};
+}
+const prog=d=>SV.p[d];
+const setProg=(d,v)=>{if(v>SV.p[d]){SV.p[d]=Math.min(5,v);persist()}};
+const rule=s=>s.bite?'かけらを持っていかれてクッキーがなくなったら負け（2分守りきればクリア）':'食べ物が全部なくなったら負け（2分守りきればクリア）';
+function saveScreen(){
+  const code=encodeSave().match(/.{1,8}/g).join(' ');
+  ov.innerHTML='<h2>💾 セーブコード</h2><p>このコードを控えておけば、別の端末やブラウザでも続きから遊べます（16進数）。</p><textarea id="sv" readonly rows="4">'+code+'</textarea><div class="row"><button data-sv="copy">コピー</button><button data-m="1">もどる</button></div><p id="svm"></p>';
+  ov.style.display='flex';
+}
+function loadScreen(){
+  ov.innerHTML='<h2>📂 ロード</h2><p>セーブコードを貼り付けてください。<br>いまのデータより進んでいる部分だけが反映されます。</p><textarea id="sv" rows="4" placeholder="01…（92桁の16進数）"></textarea><div class="row"><button data-sv="apply">ロードする</button><button data-m="1">もどる</button></div><p id="svm"></p>';
+  ov.style.display='flex';
+}
+function applyLoad(){
+  const t=document.getElementById('sv'),m=document.getElementById('svm'),r=decodeSave(t.value);
+  if(r.err){m.textContent='⚠ '+r.err;return false}
+  for(let d=0;d<4;d++)SV.p[d]=Math.max(SV.p[d],r.p[d]);
+  for(let i=0;i<20;i++)SV.b[i]=Math.max(SV.b[i],r.b[i]);
+  persist();m.textContent='✅ ロードしました！「もどる」でステージを選べます。';return true;
+}
+function copyCode(){
+  const t=document.getElementById('sv'),m=document.getElementById('svm'),ok=()=>{m.textContent='コピーしました'};
+  const fb=()=>{try{t.select();document.execCommand('copy');ok()}catch(e){m.textContent='コードを選択してコピーしてください'}};
+  try{navigator.clipboard.writeText(t.value).then(ok,fb)}catch(e){fb()}
+}
+function menu(){
+  S={mode:'menu'};const p=prog(selD);
+  ov.innerHTML='<h2>こびとからお皿を守れ！</h2><p>お皿の食べ物を狙ってこびとが集まってくる！<br>頭の上の言葉をローマ字で打って追い払おう。<br>食べ物が全部なくなる前に、2分間守りきればクリア。<br>ラスト10秒にボスが出現！</p><div class="row">'
+   +DIFF.map((d,i)=>'<button data-d="'+i+'" class="'+(i===selD?'sel':'')+'">'+d.n+'</button>').join('')+'</div><div class="row">'
+   +STAGES.map((s,i)=>'<button data-s="'+i+'"'+(i>p?' disabled':'')+'>'+(i+1)+'. '+s.n+(SV.b[selD*5+i]?'<br><small>ベスト '+SV.b[selD*5+i]+'</small>':'')+'</button>').join('')+'</div><div class="row"><button data-sv="save">💾 セーブコード</button><button data-sv="load">📂 ロード</button></div>';
+  ov.style.display='flex';
+}
+function start(si,d){
+  if(d!==undefined)selD=d;
+  const st=STAGES[si],n=st.foods.length;
+  S={mode:'play',sn:si,st,D:DIFF[selD],t:0,ty:0,ik:0,lk:-9,pend:-1,px:[],sp:1,en:[],tg:null,typed:'',cs:[],score:0,kills:0,keys:0,miss:0,fx:[],flash:0,anim:0,
+   foods:st.foods.map((e,i)=>{const a=i/n*Math.PI*2-Math.PI/2,r=n===1?0:80;return{e,hx:CX+Math.cos(a)*r,hy:CY+Math.sin(a)*r,x:CX+Math.cos(a)*r,y:CY+Math.sin(a)*r,wg:FW[e]||1,g:[],gone:false,bite:!!st.bite,pc:st.pieces||0,pt:st.pieces||0}})};
+  ov.style.display='none';
+}
+function pickWord(maxLen,minLen){
+  const p=WL.filter(o=>o.len<=maxLen&&o.len>=minLen&&!S.en.some(e=>e.wd&&e.wd.w===o.w));
+  const a=p.length?p:WL.filter(o=>o.len<=maxLen);return a[Math.floor(Math.random()*a.length)];
+}
+function spawn(boss){
+  const a=Math.random()*Math.PI*2,dir={x:Math.cos(a),y:Math.sin(a)},r=Math.random();
+  const ty=boss?BOSS:TYPES[r<.12?3:r<.45?0:r<.75?1:2];
+  const e={x:CX+dir.x*(boss?470:520),y:CY+dir.y*(boss?470:520),dir,ty,sp:boss?50:ty.sp*S.D.sp,pw:ty.pw,pt:ty.pt,sz:ty.sz,st:'walk',boss:!!boss,f:null,ft:0,ph:Math.random()*6};
+  if(boss){e.hp=1;e.wd=bossWord();e.pt=100*(selD+1);S.fx.push({x:CX,y:CY+120,t:1.6,s:'ボス出現！'})}
+  else e.wd=pickWord(ty.ml+S.D.len,1);
+  S.en.push(e);
+}
+function kept(){return S.foods.filter(f=>!f.gone).length}
+function finish(ok){
+  S.mode=ok?'clear':'fail';S.tg=null;
+  const tot=S.keys+S.miss,acc=tot?Math.round(S.keys/tot*1000)/10:0,kps=(S.ty>0?S.ik/S.ty:0).toFixed(1),kpm=Math.round(S.ty>0?S.ik/S.ty*60:0),last=S.sn===STAGES.length-1;
+  if(ok)setProg(selD,S.sn+1);
+  const bi=selD*5+S.sn,nb=ok&&S.score>SV.b[bi];if(nb){SV.b[bi]=Math.min(65535,S.score);persist()}
+  ov.innerHTML='<h2>'+(ok?(last?'全ステージクリア！🎉':'ステージクリア！🎉'):'食べ物を持っていかれた…')+'</h2><p>'+S.st.n+'（'+S.D.n+'）<br>スコア：<b>'+S.score+'</b>'+(nb?'（ベスト更新！）':'　ベスト：'+SV.b[bi])+'　撃退：'+S.kills+'匹　のこった食べ物：'+(S.st.bite?S.foods[0].pc+'/'+S.foods[0].pt+'かけら':kept()+'個')+'<br>ミス：'+S.miss+'　正確率：'+acc+'%<br>平均キータイプ数：<b>'+kps+'回/秒</b>（'+kpm+'回/分）<br><small>タイプ時間 '+S.ty.toFixed(1)+'秒（1秒以上あいた時間は除く）</small></p><div class="row">'
+   +(ok&&!last?'<button data-s="'+(S.sn+1)+'">次のステージ（Enter）</button>':'<button data-s="'+S.sn+'">'+(ok?'もう一度':'リトライ')+'（Enter）</button>')+'<button data-m="1">メニュー（Esc）</button></div>';
+  ov.style.display='flex';
+}
+function leave(e){
+  const f=e.f;if(f){const i=f.g.indexOf(e);if(i>=0)f.g.splice(i,1)}
+  if(e.crumb>0)S.fx.push({x:e.x,y:e.y-34,t:.9,s:'かけら -'+e.crumb});
+  e.st='fly';e.ft=1.2;e.f=null;e.carry=true;
+  if(S.tg===e){S.tg=null;S.typed=''}
+}
+function takePiece(e){
+  const f=e.f;f.pc--;e.crumb++;
+  for(let i=0;i<3;i++)S.px.push({x:f.x+(Math.random()-.5)*22,y:f.y+(Math.random()-.5)*22,vx:(Math.random()-.5)*70,vy:-20-Math.random()*50,t:.45,c:'#b8793a'});
+  if(f.pc<=0){f.gone=true;S.fx.push({x:f.x,y:f.y,t:1.2,s:f.e+'がぜんぶなくなった…'});for(const o of f.g.slice())leave(o);f.g=[];return}
+  if(e.crumb>=e.load)leave(e);
+}
+function pxb(e,n){
+  const bx=Math.min(W-30,Math.max(30,e.x)),by=e.y-e.sz*26-20;
+  for(let i=0;i<n;i++)S.px.push({x:bx+(Math.random()-.5)*14,y:by+(Math.random()-.5)*8,vx:(Math.random()-.5)*170,vy:-30-Math.random()*130,t:.5+Math.random()*.2,c:Math.random()<.7?'#ff7a00':'#3b2f2f'});
+}
+function repel(e){
+  if(e.f){const i=e.f.g.indexOf(e);if(i>=0)e.f.g.splice(i,1)}
+  e.st='fly';e.ft=.6;e.f=null;e.crumb=0;S.score+=e.pt;pxb(e,e.boss?40:16);S.kills++;S.fx.push({x:e.x,y:e.y-30,t:.7,s:'+'+e.pt});
+}
+function hit(e){
+  S.tg=null;S.typed='';
+  repel(e);
+}
+function key(k){
+  if(S.mode!=='play')return;
+  // タイプ中のみ秒数カウント：前のキー入力から1秒以内の間隔だけをタイプ時間に加算
+  const gk=S.t-S.lk<=1;if(gk)S.ty+=S.t-S.lk;S.lk=S.t;
+  proc(k,gk);
+}
+function proc(k,gk){
+  if(!S.tg){
+    // 画面内の小人だけが対象。最初の1文字で中央に近い順に1匹ロックし、打っている最中は絶対に切り替えない
+    let c=null,d=1e9;
+    for(const e of S.en){if(!vis(e))continue;if(e.wd.cs.some(x=>x[0]===k)){const dd=Math.hypot(e.x-CX,e.y-CY);if(dd<d){d=dd;c=e}}}
+    if(!c){S.miss++;S.flash=.12;return}
+    S.tg=c;S.typed='';S.cs=c.wd.cs.slice();S.pend=-1;
+  }
+  const nt=S.typed+k,f=S.cs.filter(x=>x.startsWith(nt));
+  if(!f.length){
+    // 「udon」のように短いつづりで打ち終えている語（語末の「ん」をn1回で済ませた）はここで完了し、このキーは次の語の入力として扱う
+    if(S.typed&&S.cs.includes(S.typed)){hit(S.tg);proc(k,gk);return}
+    S.miss++;S.flash=.12;return}
+  S.typed=nt;S.cs=f;S.keys++;if(gk)S.ik++;pxb(S.tg,5);S.pend=-1;
+  if(f.includes(nt)){if(f.some(x=>x.length>nt.length))S.pend=S.t;else hit(S.tg)} // より長いつづり(nn)がまだ有効なときは少し待つ
+}
+function update(dt){
+  if(S.mode!=='play')return;
+  S.t+=dt;S.anim+=dt;S.flash=Math.max(0,S.flash-dt);
+  if(S.tg&&S.pend>=0&&S.t-S.pend>.4&&S.cs.includes(S.typed))hit(S.tg); // nを1回で止めた語は0.4秒後に完了
+  S.sp-=dt;
+  if(S.sp<=0&&!S.bs&&S.en.filter(e=>e.st!=='fly').length<12){spawn();S.sp=Math.max(.5,S.D.iv*(2.2-S.t/TIME*.9))}
+  if(!S.bs&&S.t>=TIME-10){S.bs=true;spawn(true)}
+  for(const f of S.foods){
+    if(f.gone)continue;
+    if(f.g.length&&!f.bite){
+      let vx=0,vy=0;for(const e of f.g){vx+=e.dir.x*e.pw;vy+=e.dir.y*e.pw}
+      f.x+=vx*19/f.wg*dt;f.y+=vy*19/f.wg*dt;
+      if(Math.hypot(f.x-CX,f.y-CY)>PR){
+        f.gone=true;S.fx.push({x:f.x,y:f.y,t:1,s:f.e+'をもっていかれた！'});
+        for(const e of f.g){e.st='fly';e.ft=.5;e.f=null;e.carry=true;if(S.tg===e){S.tg=null;S.typed=''}}
+        f.g=[];
+      }
+    }else{const k=Math.min(1,dt*.8);f.x+=(f.hx-f.x)*k;f.y+=(f.hy-f.y)*k}
+  }
+  for(const e of S.en){
+    if(e.st==='walk'){
+      let b=null,d=1e9;for(const f of S.foods){if(f.gone)continue;const dd=Math.hypot(f.x-e.x,f.y-e.y);if(dd<d){d=dd;b=f}}
+      if(!b)continue;
+      if(d<26*e.sz){
+        if(b.bite){e.st='grab';e.f=b;e.load=Math.max(2,Math.round(e.pw*3));e.crumb=0;e.bt=0;b.g.push(e)}else{e.st='grab';e.f=b;b.g.push(e)}
+      }
+      else{e.x+=(b.x-e.x)/d*e.sp*dt;e.y+=(b.y-e.y)/d*e.sp*dt}
+    }else if(e.st==='grab'){
+      if(e.f.bite){e.bt+=dt;while(e.bt>=.8&&e.st==='grab'){e.bt-=.8;takePiece(e)}}
+      if(e.st!=='grab')continue;
+      const f=e.f,n=f.g.length,i=f.g.indexOf(e),a=Math.atan2(e.dir.y,e.dir.x)+(i-(n-1)/2)*.7;
+      e.x=f.x+Math.cos(a)*26*e.sz;e.y=f.y+Math.sin(a)*26*e.sz;
+    }else{const fv=e.crumb?110:280;e.ft-=dt;e.x+=e.dir.x*fv*dt;e.y+=e.dir.y*fv*dt}
+  }
+    S.en=S.en.filter(e=>{const keep=e.st!=='fly'||e.ft>0;if(!keep&&S.tg===e){S.tg=null;S.typed=''}return keep});
+  for(const f of S.fx)f.t-=dt;S.fx=S.fx.filter(f=>f.t>0);
+  for(const q of S.px){q.t-=dt;q.x+=q.vx*dt;q.y+=q.vy*dt;q.vy+=500*dt}S.px=S.px.filter(q=>q.t>0);
+  const lost=kept()===0;
+  if(lost){finish(false);return}
+  if(S.t>=TIME)finish(true);
+}
+function person(e){
+  const s=e.sz,w=Math.sin(S.anim*10+e.ph)*3;
+  ctx.save();ctx.translate(e.x,e.y);
+  if(e.st==='fly')ctx.globalAlpha=Math.max(0,e.ft*1.6);
+  ctx.fillStyle='rgba(0,0,0,.2)';ctx.beginPath();ctx.ellipse(0,12*s,11*s,4*s,0,0,7);ctx.fill();
+  ctx.fillStyle=e.ty.c;ctx.beginPath();ctx.arc(0,0,11*s,0,7);ctx.fill();
+  ctx.beginPath();ctx.moveTo(-10*s,-6*s);ctx.lineTo(0,-22*s);ctx.lineTo(10*s,-6*s);ctx.closePath();ctx.fill();
+  ctx.fillRect(-8*s+w,9*s,5*s,5*s);ctx.fillRect(3*s-w,9*s,5*s,5*s);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(-4*s,-1*s,3*s,0,7);ctx.arc(4*s,-1*s,3*s,0,7);ctx.fill();
+  ctx.fillStyle='#222';ctx.beginPath();ctx.arc(-4*s,-1*s,1.4*s,0,7);ctx.arc(4*s,-1*s,1.4*s,0,7);ctx.fill();
+  if(e.crumb){const c=3+Math.min(e.crumb,3)*2;ctx.fillStyle='#b8793a';ctx.fillRect(-c/2,-24*s-c,c,c);ctx.fillStyle='#7a4a1e';ctx.fillRect(-c/2+1,-24*s-c+1,2,2)}
+  ctx.restore();
+}
+const vis=e=>e.st!=='fly'&&e.x>=0&&e.x<=W&&e.y>=0&&e.y<=H;
+function label(e,placed){
+  const cur=S.tg===e?S.cs[0]:e.wd.cs[0],px=S.tg===e?S.typed:'',rest=cur.slice(px.length);
+  ctx.font='16px "DotGothic16",monospace';ctx.textAlign='left';
+  const w1=ctx.measureText(px).width,w2=ctx.measureText(rest).width,tw=Math.max(w1+w2,ctx.measureText(e.wd.w).width);
+  const ex=Math.min(W-tw/2-10,Math.max(tw/2+10,e.x)),bw=tw+12,bh=42,bx=ex-tw/2-6;
+  const lo=50,hi=H-34-bh; // 上下のHUDと重ならない範囲
+  let y=Math.min(hi,Math.max(lo,e.y-e.sz*26-40));
+  const hits=yy=>placed.some(r=>bx<r.x+r.w&&bx+bw>r.x&&yy<r.y+r.h&&yy+bh>r.y);
+  if(hits(y)){for(let k=1;k<=6;k++){const up=y-k*(bh+2),dn=y+k*(bh+2);if(up>=lo&&!hits(up)){y=up;break}if(dn<=hi&&!hits(dn)){y=dn;break}}}
+  placed.push({x:bx,y,w:bw,h:bh});
+  ctx.fillStyle=S.tg===e?'rgba(255,255,255,.98)':'rgba(255,255,255,.88)';
+  ctx.beginPath();ctx.roundRect(bx,y,bw,bh,7);ctx.fill();
+  ctx.fillStyle='#3b2f2f';ctx.font='16px "DotGothic16",sans-serif';ctx.textAlign='center';ctx.fillText((e.boss?'【ボス】':'')+e.wd.w,ex,y+15);
+  ctx.font='16px "DotGothic16",monospace';ctx.textAlign='left';
+  ctx.fillStyle='#ff7a00';ctx.fillText(px,ex-(w1+w2)/2,y+36);ctx.fillStyle='#3b2f2f';ctx.fillText(rest,ex-(w1+w2)/2+w1,y+36);
+}
+function draw(){
+  ctx.fillStyle=S.flash>0?'#d9a08f':'#e8c998';ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='rgba(160,110,60,.25)';for(let i=0;i<30;i++)ctx.fillRect((i*173)%W,(i*67)%H,40,4);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(CX,CY,PR,0,7);ctx.fill();
+  ctx.strokeStyle='#cfc3b3';ctx.lineWidth=6;ctx.stroke();
+  ctx.strokeStyle='#eee5d8';ctx.lineWidth=2;ctx.beginPath();ctx.arc(CX,CY,PR-18,0,7);ctx.stroke();
+  if(S.mode==='menu'){return}
+  ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='40px serif';
+  for(const f of S.foods)if(!f.gone){if(f.bite)ctx.font=Math.round(24+f.pc/f.pt*56)+'px serif';ctx.fillText(f.e,f.x,f.y);ctx.font='40px serif'}
+  ctx.textBaseline='alphabetic';
+  const es=S.en.slice().sort((a,b)=>a.y-b.y);
+  for(const e of es)person(e);
+  if(S.tg&&S.tg.st!=='fly'){ctx.strokeStyle='#ff7a00';ctx.lineWidth=3;ctx.beginPath();ctx.arc(S.tg.x,S.tg.y,24*S.tg.sz,0,7);ctx.stroke()}
+  const placed=[];
+  for(const e of es.filter(vis).sort((a,b)=>(S.tg===b)-(S.tg===a)||Math.hypot(a.x-CX,a.y-CY)-Math.hypot(b.x-CX,b.y-CY)))label(e,placed); // 狙い中→中央に近い順に配置
+  for(const q of S.px){ctx.globalAlpha=Math.min(1,q.t*3);ctx.fillStyle=q.c;ctx.fillRect(Math.round(q.x/4)*4,Math.round(q.y/4)*4,4,4)}ctx.globalAlpha=1;
+  ctx.textAlign='center';ctx.font='16px "DotGothic16",sans-serif';
+  for(const f of S.fx){ctx.globalAlpha=Math.min(1,f.t*2);ctx.fillStyle=f.s[0]==='+'?'#2d7a2d':'#c0392b';ctx.fillText(f.s,f.x,f.y-(1-f.t)*30);ctx.globalAlpha=1}
+  ctx.textAlign='left';ctx.fillStyle='#3b2f2f';ctx.font='16px "DotGothic16",sans-serif';
+  ctx.fillText('Stage '+(S.sn+1)+' '+S.st.n+'（'+S.D.n+'）',12,22);
+  ctx.font='16px "DotGothic16",sans-serif';ctx.fillText('ルール：'+rule(S.st),12,42);
+  ctx.font='16px "DotGothic16",sans-serif';ctx.fillText('スコア '+S.score,12,H-22);
+  ctx.textAlign='right';ctx.fillText((S.st.bite?'クッキー '+S.foods[0].pc+'/'+S.foods[0].pt+'かけら　':'のこり '+kept()+'個　')+Math.max(0,Math.ceil(TIME-S.t))+'秒',W-12,H-22);
+  ctx.fillStyle='rgba(0,0,0,.2)';ctx.fillRect(0,H-8,W,8);ctx.fillStyle='#2ecc71';ctx.fillRect(0,H-8,W*Math.min(1,S.t/TIME),8);
+}
+function loop(ts){const dt=Math.min(.05,(ts-last)/1000||0);last=ts;update(dt);draw();requestAnimationFrame(loop)}
+document.addEventListener('keydown',e=>{
+  if(e.ctrlKey||e.metaKey||e.altKey)return;
+  if(S.mode==='menu')return;
+  if(S.mode==='clear'||S.mode==='fail'){
+    if(e.key==='Enter'){e.preventDefault();const last=S.mode==='clear'&&S.sn<STAGES.length-1;start(last?S.sn+1:S.sn)}
+    else if(e.key==='Escape')menu();return}
+  if(e.key==='Escape'){menu();return}
+  if(e.key==='Backspace'){e.preventDefault();S.tg=null;S.typed='';return}
+  if(e.key===' ')e.preventDefault();
+  if(e.repeat)return; // 長押しの連続入力はミスにしない
+  const k=e.key.length===1?e.key.toLowerCase():'';
+  if(/^[a-z-]$/.test(k))key(k);
+});
+ov.addEventListener('click',e=>{
+  const b=e.target.closest?e.target.closest('button'):null;if(!b||b.disabled)return;
+  if(b.dataset.d!==undefined){selD=+b.dataset.d;menu()}
+  else if(b.dataset.s!==undefined)start(+b.dataset.s);
+  else if(b.dataset.sv==='save')saveScreen();
+  else if(b.dataset.sv==='load')loadScreen();
+  else if(b.dataset.sv==='apply')applyLoad();
+  else if(b.dataset.sv==='copy')copyCode();
+  else if(b.dataset.m)menu();
+});
+loadLS();menu();
+window.__g={SV,encodeSave,decodeSave,applyLoad,saveScreen,loadScreen,S:()=>S,key,update,draw,start,cands,WORDS,menu,STAGES,spawn,BOSSP,bossWord,setD:d=>{selD=d}};
+requestAnimationFrame(loop);
+})();
+</script></body></html>
